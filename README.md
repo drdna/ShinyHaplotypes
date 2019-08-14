@@ -19,17 +19,19 @@ Download the ZIP archive to your local machine. Extract the archive:
 unzip ShinyHaplotypes-master.zip
 ```
 
-Change to the ShinyHaplotypes-master directory 
+Change to the ShinyHaplotypes-master directory:
 
 ```
 cd ShinyHaplotypes-master
 ```
 
-Now you're ready to start using the tools
+Now you're ready to start using the tools.
 
 ## Running the programs
 
-First we need to take metadata from the strain.idfile and add it to the haplotype information contained in the main chromopainter datafiles. The following commands show you how to run the program using the provided sample datasets. First we run the Convert_sliding4R.pl script. Usage: Convert_sliding4R.pl <idfile> <cpfile> <outfile-name>
+First we need to take metadata from the strain.idfile and add it to the haplotype information contained in the main chromopainter datafiles. The following commands show you how to run the program using the provided sample datasets. First we run the Convert_sliding4R.pl script. 
+
+Usage: Convert_sliding4R.pl #idfile# #cpfile# #outfile-name#
 ```
 perl PERL/Convert_sliding4R.pl strain.idfile HAPLOTYPES/chr1.cp chr1_haplotypes.txt
 ```
