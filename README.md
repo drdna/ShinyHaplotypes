@@ -1,7 +1,8 @@
 # ShinyHaplotypes
 
 This project using a sliding window approach to compare haplotype similarity among various fungal isolates on a chromosome-by-chromosome basis. Plot lines are colored according to phylogenetic groupings, which allows one to visualize admixed chromosome regions. Input files are in the format used by Chromopainter (https://people.maths.bris.ac.uk/~madjl/finestructure-old/chromopainter_info.html)
-Perl scripts are used to covert the chromopainter files into datasets that can be imported into a R Shiny app which allows one to visualize haplotype similarity between isolates in an interactive manner.  
+Perl scripts are used to covert the chromopainter files into datasets that can be imported into a R Shiny app which allows one to visualize haplotype similarity between isolates in an interactive manner.
+
 ![ShinyHaplotypes](/ShinyHaplotypes.jpg)
 
 ## Getting Started
