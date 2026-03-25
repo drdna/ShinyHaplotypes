@@ -49,11 +49,9 @@ my %TotalLen;
   
 open(HAPLOS, '>', $haplOutfile) || die "Can't open outfile\n";
  
-& HEADER_LINES;
+& HEADER_REF_LINES;
        
 & STRAIN_VARIANTS;
-
-#& CULL_INVARIANTS;
 
 close HAPLOS;
 
@@ -110,7 +108,7 @@ sub GRAB_BIALLELIC_VARIANTS {
 
   foreach $snpFile (@FilesList) {
     next if $snpFile !~ /out$/;
-    ($ref, $test, $tail) = split(/_v_|_out/, $snpFile);
+    ($refid, $test, $tail) = split(/_v_|_out/, $snpFile);
     next unless (exists($StrainHash{$test}));
 
     open(SF, "$snpDir/$snpFile") || die "Problem\n";
@@ -120,53 +118,94 @@ sub GRAB_BIALLELIC_VARIANTS {
       chomp($L);
       @Data = split(/\t/, $L);
       if(@Data == 7) {				# skip lines with repeat field
-        ($Ref, $Other, $RefPos, $OtherPos, $RefNucl, $OtherNucl, $Dir) = @Data;
+        ($Ref, $Alt, $RefPos, $AltPos, $RefNucl, $AltNucl, $Dir) = @Data;
         $Ref =~ s/.+?(\d+)$/$1/;
-        next if ($RefNucl eq '-' || $OtherNucl eq '-');
-        next if $bialleleHash{$Ref}{$RefPos} eq 'X';
-
-        if($bialleleHash{$Ref}{$RefPos} =~ /[AGTC]/) {
-          $bialleleHash{$Ref}{$RefPos} = 'X' if $bialleleHash{$Ref}{$RefPos} ne $OtherNucl
+        next if ($RefNucl eq '-' || $AltNucl eq '-');
+        $snp = $RefNucl.$AltNucl;
+        next if $allAlleleHash{$Ref}{$RefPos} eq 'X';
+        if($allAlleleHash{$Ref}{$RefPos} =~ /[AGTC]/) {
+          $allAlleleHash{$Ref}{$RefPos} = 'X' if $allAlleleHash{$Ref}{$RefPos} ne $AltNucl
         }
 
         else {
-          $bialleleHash{$Ref}{$RefPos} = $OtherNucl
+          $allAlleleHash{$Ref}{$RefPos} = $AltNucl;
+          $allSNPsHash{$Ref}{$RefPos} = $snp
         }
       }
-      elsif(@Data == 6) {                          # skip lines with repeat field
-        ($Ref, $Other, $RefPos, $OtherPos, $RefNucl, $OtherNucl) = @Data;
+      elsif(@Data == 6) {                          # run on files lacking strand information and skip lines with repeat field
+        ($Ref, $Alt, $RefPos, $AltPos, $RefNucl, $AltNucl) = @Data;
         $Ref =~ s/.+?(\d+)$/$1/;
-        next if ($RefNucl eq '-' || $OtherNucl eq '-');
-        next if $bialleleHash{$Ref}{$RefPos} eq 'X';
+        next if ($RefNucl eq '-' || $AltNucl eq '-');
+        $snp = $RefNucl.$AltNucl;
+        next if $allAlleleHash{$Ref}{$RefPos} eq 'X';
     
-        if($bialleleHash{$Ref}{$RefPos} =~ /[AGTC]/) {
-          $bialleleHash{$Ref}{$RefPos} = 'X' if $bialleleHash{$Ref}{$RefPos} ne $OtherNucl
+        if($allAlleleHash{$Ref}{$RefPos} =~ /[AGTC]/) {
+          $allAlleleHash{$Ref}{$RefPos} = 'X' if $allAlleleHash{$Ref}{$RefPos} ne $AltNucl
         }
  
         else {
-          $bialleleHash{$Ref}{$RefPos} = $OtherNucl
+          $allAlleleHash{$Ref}{$RefPos} = $AltNucl;
+          $allSNPsHash{$Ref}{$RefPos} = $snp
         }
       }
-
     } 
     close SF
   }
-  closedir OUTFILES
-}
 
+  closedir OUTFILES;
 
-# write header lines
+# Create list of SNP positions on reference chromosomes
 
-sub HEADER_LINES {
+  $regex = qr/A|G|T|C/;
 
-  foreach my $seq (sort {$a cmp $b} keys %bialleleHash) {
-    my @sites = sort {$a <=> $b} keys %{$bialleleHash{$seq}};
-    if(@sites >= 500) {
-      print HAPLOS "sites\tsequence$seq\t";
-      print HAPLOS join(" ", @sites), "\n"
+  open(SNPsList, '>', $haplOutfile.".snps");
+
+  foreach my $contig (sort {$a cmp $b} keys %allAlleleHash) {
+
+    @positions = sort {$a <=> $b} keys %{$allAlleleHash{$contig}};
+
+    $numSNPs += @positions;
+
+    foreach my $pos (@positions) {
+
+      print SNPsList "$contig\t$pos\n";
+
+      if($allAlleleHash{$contig}{$pos} =~ /($regex)/g) {
+
+        push @{$biAlleleHash{$contig}}, $pos;
+        push @{$biSNPsHash{$contig}}, $allSNPsHash{$contig}{$pos}  
+
+      }
     }
   }
 
+  close SNPsList;
+
+  print "Number of SNPs: $numSNPs\n";
+
+}
+
+
+# write header lines (***currently prints out multiallelic sites***)
+
+sub HEADER_REF_LINES {
+
+  foreach my $seq (sort {$a cmp $b} keys %biAlleleHash) {
+    my @sites = @{$biAlleleHash{$seq}};
+    my @snps = @{$biSNPsHash{$seq}}; #    print "$seq\t$value\t@{$biAlleleHash{$seq}}\n";
+    # edit next line for minimum length
+    if(@sites >= 1) {
+      print HAPLOS "sites\tsequence$seq\t";
+      print HAPLOS join(" ", @sites), "\n";
+      print HAPLOS "snps\tsequence$seq\t";
+      print HAPLOS join(" ", @snps), "\n";
+    }
+  }
+  foreach my $seq (sort {$a cmp $b} keys %biAlleleHash) {
+    my @sites = @{$biAlleleHash{$seq}};
+    $refHapl = '1' x @sites;
+    print HAPLOS join("\t", ($refid, "ref", "sequence".$seq, $refHapl)), "\n" if @sites > 500;
+  }
 }
 
 
@@ -231,9 +270,9 @@ sub CALL_VARIANTS {
   %SNPsHash = %$SNPsHashRef;
   %alignString = %$alignStringRef;
 
-  foreach $sequence (sort {$a <=> $b} keys %bialleleHash) {
+  foreach $sequence (sort {$a <=> $b} keys %biAlleleHash) {
     next unless (exists($SNPsHash{$test}));
-    foreach $pos (sort {$a <=> $b} keys %{$bialleleHash{$sequence}}) { 
+    foreach $pos (@{$biAlleleHash{$sequence}}) { 
       if(exists($SNPsHash{$test}{$sequence}{$pos})) {
         $Haplotypes{$sequence} .= 0;
         $haplLength = length($Haplotypes{$sequence});
@@ -280,6 +319,7 @@ sub CULL_INVARIANTS {
   }
 }
 
+
 sub PRINT_HAPLOTYPES {
 
   print "Printing haplotypes\n\n";
@@ -294,7 +334,6 @@ sub PRINT_HAPLOTYPES {
   %Haplotypes = ()
 }
 
-
 sub PRINT_NO_MISSING_HAPLOTYPES {
 
   open(HAPLOS, $haplOutfile);
@@ -307,14 +346,28 @@ sub PRINT_NO_MISSING_HAPLOTYPES {
       $sequence =~ s/sequence//;
       @sites = split(/ /, $sites);
       foreach my $pos (sort {$b <=> $a} keys %{$MissingHash{$sequence}}) {
-        splice(@sites, $pos-1, 1)
+        splice(@sites, $pos-1, 1);
       }
-      if (@sites >= 500) {
+      # edit next line depending on purpose
+      if (@sites >= 1) {
         print NMHAPLOS "sites\t$seqPrefix$sequence\t";
         print NMHAPLOS join (" ", @sites), "\n";
       }
     }  
-  
+
+    elsif ($H =~ /^snps/) {
+      my($prefix, $sequence, $snps) = split(/\t/, $H);
+      $sequence =~ s/sequence//;
+      @snps = split(/ /, $snps);
+      foreach my $pos (sort {$b <=> $a} keys %{$MissingHash{$sequence}}) {
+        splice(@snps, $pos-1, 1);
+      }
+      if (@sites >= 500) {
+        print NMHAPLOS "snps\t$seqPrefix$sequence\t";
+        print NMHAPLOS join (" ", @snps), "\n";
+      }
+    }  
+
     else {
       my($test, $pop, $sequence, $haplotype) = split(/\t/, $H);
       $sequence =~ s/sequence//;
@@ -322,7 +375,7 @@ sub PRINT_NO_MISSING_HAPLOTYPES {
       foreach my $pos (sort {$b <=> $a} keys %{$MissingHash{$sequence}}) {
         substr($haplotype, $pos-1, 1, '');
       }
-      print NMHAPLOS join ("\t", ($test, $pop, $seqPrefix.$sequence, $haplotype)), "\n" if length($haplotype) >= 5;
+      print NMHAPLOS join ("\t", ($test, $pop, $seqPrefix.$sequence, $haplotype)), "\n" if length($haplotype) >= 500;
     }
   }
   
