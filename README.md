@@ -29,25 +29,25 @@ cd ShinyHaplotypes-master
 
 Now you're ready to start using the tools.
 
-## Running the programs
-
-First we need to take metadata from the strain.idfile and add it to the haplotype information contained in the main chromopainter datafiles. The following commands show you how to run the program using the provided sample datasets. First we run the Convert_sliding4R.pl script. 
-
-Usage: Convert_sliding4R.pl #idfile# #cpfile# #outfile-name#
+## Generate the ShinyHaplotypes data files:
+Usage: perl ShinyData.pl <Haplotypes_file> <window-size> <step-size> <output-directory> <scale? (default = no)>
 ```
-perl PERL/Convert_sliding4R.pl strain.idfile HAPLOTYPES/chr1.cp chr1_haplotypes.txt
-```
-This can repeated using the datasets for all chromosomes.
-
-Next, we run the sliding window analysis that compares haplotype similarity along the chromosomes. Window-size (number of variant sites compared) and window step size are user definable. Values of 1000 and 200, respectively produce plots with sufficient definition and navigability. Usage: Slide_compare.pl <outfile-from-Convert_sliding4R> <window-size> <step-size> <output-directory>
-
-```
-perl Slide_compare.pl chr1_haplotypes.txt 1000 200 SHINYOUT
+perl Slide_compare.pl chr1_haplotypes.txt 1000 200 SHINYOUT no
 ```
 
 ### Running the SHINY app
 
-Open the Haplotype_div_Shiny.R script in RStudio. If necessary change the path to the directory containing the .diffs datafiles. Save any changes and then click 'Run App.' This will open an interactive window, where you can select which strain to compare, with which host-specialized populations, and on which chromosome. Also available is the ability to zoom in on a specific regions of the haplotype.
+1. Open the ShinyPlot.R script in RStudio
+2. Click "Run App"
+3. Select the directory containing the datafiles
+4. Start exploring haplotype diversity by selecting different toggles and sliders
+
+### Analysis of specific chromosome regions/strains
+
+1. Identify a region with an interesting pattern
+2. Use the mouse to click-drag to select any number of plot traces. This will capture information about the chromosome region specified, as well as the strains whose plot lines are interested by the box boundaries
+3. Use the pop-up menu to select the type of analysis required (list of capture strains; pairwise divergence analysis; phylogenetic tree construction; PCA analysis)
+4. Use buttons at bottom of rendered plot to export graphics, or underlying dataset for analysis using third party programs
 
 ## License
 
