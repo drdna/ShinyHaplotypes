@@ -2,7 +2,7 @@
 
 ##############################
 #
-# Generate_haplotypes.pl
+# WriteHaplotypes.pl
 #
 # written by Mark L. Farman
 #
@@ -16,7 +16,7 @@
 
 #use warnings;
 
-die "Usage: perl Generate_haplotypes-v7.pl <strainList> <SNPFILE_DIR> <BLASTFILE-DIR> <HAPLOTYPES_OUTFILE> <REF> <CHR|CONTIG>\n" if @ARGV < 5;
+die "Usage: perl WriteHaplotypes.pl <strainList> <SNPFILE_DIR> <BLASTFILE-DIR> <HAPLOTYPES_OUTFILE> <REF> <SEQUENCE|CHR|CONTIG>\n" if @ARGV < 5;
 
 ($strainList, $snpDir, $blastDir, $haplOutfile, $refGenome, $seqPrefix) = @ARGV;
 
