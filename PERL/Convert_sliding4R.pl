@@ -1,120 +1,174 @@
 #!/usr/bin/perl
 
-# Reads Strain ID file ("strain-idfile") & CP file and 
+# Run a sliding window analysis of haplotype divergence within a specified window size
 
-# creates matrix to be used as input to Slide_compare.pl
+# Usage: perl ShinyPlot.pl <path/to/Sliding_4R_outfile> <window_size> <step-size> <output-directory> <scaled? (yes/no)>
 
-die "\nUsage: perl Convert_sliding_4R.pl <strain.idfile> <CP_file>\n\n" if @ARGV < 2;
+print "Usage: perl Slide_compare.pl <path/to/haplotypes-file> <window_size> <step-size> <output-directory>\n" if @ARGV < 5;
 
-use warnings;
+#use warnings;
 
-use strict;
+#use strict;
 
+# Declare global variables
 
-# declare global variables
+my $Chr;
 
-my %IDhash;
+my $LineCount;
 
-my @IDs;
+my @Positions;
 
+my @DiffList;
 
-# Open chromopainter idfile and generate strain => population hash
+my %PopulationHash;
 
-open(IDFILE, $ARGV[0]);
+my %HaplotypeHash;
 
-while(my $L = <IDFILE>) {
+my @RefHaplotypeList;
 
-  chomp($L);
+my $HaplotypeLen;
 
-  my($ID, $Pop, $Include) = split(/ /, $L);		
+#my ($inFile, $windowSize, $stepSize, $outdir) = @ARGV;
 
-  push @IDs, $ID;
+#print "($inFile, $windowSize, $stepSize, $outdir)\n";
 
-  $IDhash{$ID} = $Pop;	# Store info on each strain's population affiliation
+my ($inFile, $windowSize, $stepSize, $outdir, $scaled) = @ARGV if @ARGV == 5;
 
-}
+# open haplotypes file
 
-close IDFILE;
+open(DATA, $inFile) || die "Can't find infile $inFile\n";
 
-
-# open chromopainter file
-
-open(CPFILE, $ARGV[1]);
-
-if(@ARGV == 3) {
-
-  open(OUT, '>', $ARGV[2]) || die "Can't create outfile\n";
-
-}
-
-elsif($ARGV[1] =~ /(chr\d+)/) {
-
-  my $Chr = $1;
-
-  open(OUT, '>', "$Chr"."_haplotypes.txt") || die "Can't create outfile\n";
-
-}
-
-else {
-
-  die "You either need to specify outfile name as an argument, or the haplotype filename must start with 'chr1', 'chr2', etc.\n"  
-
-}
-
-
-my $lineNum = 0;
-
-my $hapNum = 0;	# my in orig
-
-while(my $L = <CPFILE>) {
+while($L = <DATA>) {
 
   chomp($L);
 
-  $lineNum++;
+  next if $L =~ /^snps/;
 
-  printPos($L) if $lineNum == 3;
+  if($L =~ /^sites/) {
 
-  $hapNum = printHaps($L, $lineNum, $hapNum) if $lineNum >3;
+    ($lineIdentifier, $sequence, $sites) = split(/\t/, $L);
+
+    $SitesHash{$sequence} = $sites
+
+  }
+
+  else {
+
+    ($strain, $pop, $sequence, $haplotypeString) = split(/\t/, $L);	# write haplotype data to a local array 
+
+    $PopulationHash{$strain} = $pop;
+
+    next if length($haplotypeString) < $ARGV[1] * 10;				# skip if number of variant sites is small (< ~50 sliding windows)
+
+    $HaplotypeHash{$strain}{$sequence} = $haplotypeString;    				# write haplotype array to a hash keyed by strain ID and sequence 
+
+  }
+
+}
+
+mkdir "$outdir" || die "Can't create output directory $!\n";
+
+foreach my $TestStrain (sort {$a cmp $b} keys %HaplotypeHash) {
+
+  foreach $sequence (sort {$a cmp $b} keys %{$HaplotypeHash{$TestStrain}}) {
+
+    my @WindowStarts;
+
+    my $sites = $SitesHash{$sequence};
+    
+    @Positions = split (/ /, $sites);
+
+    my $NumSites = @Positions;
+
+    print "$TestStrain\t$NumSites\n";
+
+    open (OUT, '>', "$outdir/$sequence.$TestStrain.diffs") || die "Can't create outfile\n";
+
+    for(my $j=0; $j<= $NumSites - $windowSize; $j += $stepSize) {
+
+#      print "$Positions[$j]\n";
+
+      push @WindowStarts, $Positions[$j]
+
+    }
+
+    my $NumWindows = @WindowStarts;
+
+    print OUT "sites\t";
+
+    print OUT join ("\t", @WindowStarts), " clade\n";		# print header line for R input
+
+    my $TestHaplotype = $HaplotypeHash{$TestStrain}{$sequence};
+
+    Compare_2_others($TestStrain, $sequence, $TestHaplotype);
+
+    @WindowStarts = ();
+
+    close OUT
+
+  }
+
+}
+
+sub Compare_2_others {
+
+  my $i;
+
+  my($TestStrain, $sequence, $TestHaplotype) = @_;
+
+  foreach my $comparatorStrain (sort {$a cmp $b} keys %HaplotypeHash) {
+
+    next if $comparatorStrain eq $TestStrain;
+
+    my $compHaplotype = $HaplotypeHash{$comparatorStrain}{$sequence};
+
+    slidingWindows($comparatorStrain, $TestHaplotype, $compHaplotype);
+
+  }
+
+}
+
+sub slidingWindows {
+
+  my $j;
+
+  my($comparatorStrain, $TestHaplotype, $Haplotype) = @_;
+
+  my @WindowSNPsTotal = ();
+
+  for($j=0; $j<= length($TestHaplotype) - $windowSize; $j += $stepSize) {
+
+    my $TestHaplotypeWindow = substr($TestHaplotype, $j, $windowSize);
+
+    my $HaplotypeWindow = substr($Haplotype, $j, $windowSize); 
+
+    my $SNPsTotal = ( $TestHaplotypeWindow ^ $HaplotypeWindow ) =~ tr/\0//c;      
+
+    my $actualWindowLength = $Positions[$j+$windowSize] - $Positions[$j+1];
+
+    if($scaled eq 'yes') { 
+
+      push @WindowSNPsTotal, $SNPsTotal/$actualWindowLength;
+
+    }
+
+    else {
+
+      push @WindowSNPsTotal, $SNPsTotal/$windowSize;
+
+    }
+
+  }
+
+  print OUT "$comparatorStrain\t";
+
+  print OUT join ("\t", @WindowSNPsTotal), "\t$PopulationHash{$comparatorStrain}\n";
+
+}       
+
+close DATA
+   
 
   
-}
 
-close CPFILE;
-
-close OUT;
-
-
-## print the SNP positions
-
-sub printPos {
-
-  my @Positions = split(/ /, $_[0]);
-
-  shift @Positions;
-
-  print OUT join (" ", @Positions), " clade strain\n";
-
-}
-
-
-## print the haplotypes (space separated, with clade ID info)
-
-sub printHaps {
-
-  my($hapLine, $lineNum, $hapNum) = @_;
-
-  my @Haps = split(//, $hapLine);
-
-  unshift @Haps, $IDs[$hapNum];
-
-  print OUT join (" ", @Haps), " $IDhash{$IDs[$hapNum]} $IDs[$hapNum]\n";
-
-  $hapNum++;
-
-  return($hapNum)
-
-}
-
-
-
-    
+  
